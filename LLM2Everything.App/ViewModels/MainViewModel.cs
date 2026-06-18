@@ -42,6 +42,8 @@ public sealed partial class MainViewModel : ObservableObject
     public ObservableCollection<SearchResultItem> Results { get; } = [];
     public ObservableCollection<HistoryEntry> History { get; } = [];
     public ObservableCollection<FileTypeDefinition> FileTypes { get; } = [];
+    public bool IsFileTypeSelectionEnabled => !IsBusy && SelectedFileTypeModeOption.Value == FileTypeMode.FileType;
+    public bool IsExtensionSelectionEnabled => !IsBusy && SelectedFileTypeModeOption.Value == FileTypeMode.Extension;
     public IReadOnlyList<FileTypeModeOption> FileTypeModeOptions { get; } =
     [
         new("指定なし", FileTypeMode.None),
@@ -94,6 +96,18 @@ public sealed partial class MainViewModel : ObservableObject
 
     [RelayCommand] private void Cancel() => _cts?.Cancel();
     [RelayCommand] private void ToggleDetail() => IsDetailVisible = !IsDetailVisible;
+
+    partial void OnSelectedFileTypeModeOptionChanged(FileTypeModeOption value)
+    {
+        OnPropertyChanged(nameof(IsFileTypeSelectionEnabled));
+        OnPropertyChanged(nameof(IsExtensionSelectionEnabled));
+    }
+
+    partial void OnIsBusyChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsFileTypeSelectionEnabled));
+        OnPropertyChanged(nameof(IsExtensionSelectionEnabled));
+    }
 
     [RelayCommand(CanExecute = nameof(CanOperate))]
     private void OpenSettings()
@@ -184,6 +198,8 @@ public sealed partial class MainViewModel : ObservableObject
         finally
         {
             IsBusy = false;
+            OnPropertyChanged(nameof(IsFileTypeSelectionEnabled));
+            OnPropertyChanged(nameof(IsExtensionSelectionEnabled));
             SearchCommand.NotifyCanExecuteChanged();
             SearchEditedQueryCommand.NotifyCanExecuteChanged();
             OpenSettingsCommand.NotifyCanExecuteChanged();

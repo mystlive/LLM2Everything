@@ -66,23 +66,24 @@
                       IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBooleanConverter}}"/>
             <ComboBox Grid.Row="1" Grid.Column="2" Height="30"
                       ItemsSource="{Binding FileTypes}" DisplayMemberPath="Name" SelectedItem="{Binding SelectedFileType}"
-                      IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBooleanConverter}}"/>
+                      IsEnabled="{Binding IsFileTypeSelectionEnabled}"/>
             <TextBox Grid.Row="1" Grid.Column="3" Height="30"
                      Text="{Binding ExtensionText, UpdateSourceTrigger=PropertyChanged}"
                      ToolTip="例: pdf, docx, gguf。先頭の . は不要です"
-                     IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBooleanConverter}}"/>
+                     IsEnabled="{Binding IsExtensionSelectionEnabled}"/>
         </Grid>
 
         <Border DockPanel.Dock="Top" Background="White" BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,0,0,10">
             <DockPanel>
-                <Button DockPanel.Dock="Right" Content="変換詳細" Command="{Binding ToggleDetailCommand}"/>
+                <Button DockPanel.Dock="Right" Content="変換詳細を表示/非表示" Command="{Binding ToggleDetailCommand}"/>
                 <TextBlock Text="{Binding StatusText}" FontWeight="SemiBold" Margin="4,0,12,0"/>
                 <TextBlock Text="{Binding ElapsedText}" Foreground="#6B7280"/>
             </DockPanel>
         </Border>
 
-        <Expander DockPanel.Dock="Top" Header="変換詳細" IsExpanded="{Binding IsDetailVisible}" Margin="0,0,0,10">
-            <Grid Background="White">
+        <Border DockPanel.Dock="Top" Background="White" BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,0,0,10"
+                Visibility="{Binding IsDetailVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="150"/>
@@ -95,7 +96,7 @@
                 <TextBox Grid.Row="1" Text="{Binding DetailText}" FontFamily="Consolas" AcceptsReturn="True"
                          VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
             </Grid>
-        </Expander>
+        </Border>
 
         <Grid>
             <Grid.ColumnDefinitions>
@@ -130,11 +131,11 @@
                 </ListView.ContextMenu>
                 <ListView.View>
                     <GridView>
-                        <GridViewColumn Header="ファイル名" DisplayMemberBinding="{Binding FileName}" Width="230"/>
-                        <GridViewColumn Header="フルパス" DisplayMemberBinding="{Binding FullPath}" Width="470"/>
-                        <GridViewColumn Header="拡張子" DisplayMemberBinding="{Binding Extension}" Width="80"/>
-                        <GridViewColumn Header="サイズ" DisplayMemberBinding="{Binding SizeBytes}" Width="120"/>
-                        <GridViewColumn Header="更新日時" DisplayMemberBinding="{Binding ModifiedAt}" Width="170"/>
+                        <GridViewColumn Header="ファイル名" DisplayMemberBinding="{Binding FileName}" Width="210"/>
+                        <GridViewColumn Header="フルパス" DisplayMemberBinding="{Binding FullPath}" Width="390"/>
+                        <GridViewColumn Header="拡張子" DisplayMemberBinding="{Binding Extension}" Width="70"/>
+                        <GridViewColumn Header="サイズ" DisplayMemberBinding="{Binding SizeBytes}" Width="95"/>
+                        <GridViewColumn Header="更新日時" DisplayMemberBinding="{Binding ModifiedAt}" Width="145"/>
                     </GridView>
                 </ListView.View>
             </ListView>
