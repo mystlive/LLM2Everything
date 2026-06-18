@@ -104,7 +104,20 @@ public sealed partial class MainViewModel : ObservableObject
     private async Task SearchEditedQueryAsync()
     {
         _cts = new CancellationTokenSource();
-        await ExecuteEverythingAsync(EditableEverythingQuery, ParseMethod.Manual, _cts.Token);
+        try
+        {
+            await ExecuteEverythingAsync(EditableEverythingQuery, ParseMethod.Manual, _cts.Token);
+        }
+        catch (OperationCanceledException) { StatusText = "キャンセルしました。"; }
+        catch (Exception ex)
+        {
+            StatusText = ex.Message;
+            await _logger.ErrorAsync("手動検索式の実行でエラー", ex);
+        }
+        finally
+        {
+            ResetBusyState();
+        }
     }
 
     [RelayCommand] private void Cancel() => _cts?.Cancel();
@@ -186,7 +199,7 @@ public sealed partial class MainViewModel : ObservableObject
         SearchText = entry.Input;
         EditableEverythingQuery = entry.EverythingQuery;
         _cts = new CancellationTokenSource();
-        await ExecuteEverythingAsync(entry.EverythingQuery, ParseMethod.Cache, _cts.Token);
+        await RunSearchPipelineAsync(_cts.Token);
     }
 
     private bool CanOperate() => !IsBusy;
@@ -243,12 +256,7 @@ public sealed partial class MainViewModel : ObservableObject
         }
         finally
         {
-            IsBusy = false;
-            OnPropertyChanged(nameof(IsFileTypeSelectionEnabled));
-            OnPropertyChanged(nameof(IsExtensionSelectionEnabled));
-            SearchCommand.NotifyCanExecuteChanged();
-            SearchEditedQueryCommand.NotifyCanExecuteChanged();
-            OpenSettingsCommand.NotifyCanExecuteChanged();
+            ResetBusyState();
         }
     }
 
@@ -273,6 +281,13 @@ public sealed partial class MainViewModel : ObservableObject
         SetBusy("es.exeで検索中", TimeSpan.FromSeconds(_settings.EverythingTimeoutSeconds));
         var hasAppSideFilters = intent is not null && HasAppSideFilters(intent);
         var executableQuery = hasAppSideFilters ? _queryBuilder.Build(intent!, _fileTypes, includeDateFilters: false) : query;
+        if (string.IsNullOrWhiteSpace(executableQuery) && hasAppSideFilters)
+            executableQuery = ".";
+        if (string.IsNullOrWhiteSpace(executableQuery))
+        {
+            StatusText = "検索式が空です。検索したい内容を入力してください。";
+            return;
+        }
         var rawLimit = hasAppSideFilters && _settings.ResultLimit is > 0
             ? Math.Max(_settings.ResultLimit.Value, 10000)
             : _settings.ResultLimit;
@@ -327,6 +342,15 @@ public sealed partial class MainViewModel : ObservableObject
     private IEnumerable<string> SplitFolders() => FolderText.Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
     private IEnumerable<string> SplitExtensions() => ExtensionText.Split([',', ';', ' ', '　'], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Select(DefaultFileTypes.NormalizeExtension).Where(e => e.Length > 0);
     private void SetBusy(string status, TimeSpan timeout) { IsBusy = true; StatusText = status; ElapsedText = $"0秒経過 / 残り{(int)timeout.TotalSeconds}秒"; }
+    private void ResetBusyState()
+    {
+        IsBusy = false;
+        OnPropertyChanged(nameof(IsFileTypeSelectionEnabled));
+        OnPropertyChanged(nameof(IsExtensionSelectionEnabled));
+        SearchCommand.NotifyCanExecuteChanged();
+        SearchEditedQueryCommand.NotifyCanExecuteChanged();
+        OpenSettingsCommand.NotifyCanExecuteChanged();
+    }
     private static bool HasAppSideFilters(SearchIntent intent) =>
         intent.Modified.Start is not null || intent.Modified.End is not null;
 
