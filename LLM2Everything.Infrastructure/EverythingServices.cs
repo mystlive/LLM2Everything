@@ -55,6 +55,7 @@ public sealed class EverythingProcessService : IEverythingProcessService
 public sealed class EsExeSearchService : IEverythingSearchService
 {
     private readonly Func<string> _pathProvider;
+    private static readonly Encoding EsOutputEncoding = CreateEsOutputEncoding();
 
     public EsExeSearchService(Func<string> pathProvider) => _pathProvider = pathProvider;
 
@@ -76,8 +77,8 @@ public sealed class EsExeSearchService : IEverythingSearchService
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
-            StandardOutputEncoding = Encoding.UTF8,
-            StandardErrorEncoding = Encoding.UTF8
+            StandardOutputEncoding = EsOutputEncoding,
+            StandardErrorEncoding = EsOutputEncoding
         };
         if (request.Limit is > 0)
         {
@@ -173,5 +174,11 @@ public sealed class EsExeSearchService : IEverythingSearchService
         if (string.IsNullOrWhiteSpace(query)) throw new ArgumentException("検索式が空です。");
         if (query.Any(char.IsControl)) throw new ArgumentException("検索式に制御文字が含まれています。");
         if (query.Contains('\r') || query.Contains('\n')) throw new ArgumentException("検索式に改行が含まれています。");
+    }
+
+    private static Encoding CreateEsOutputEncoding()
+    {
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+        return Encoding.GetEncoding(932);
     }
 }

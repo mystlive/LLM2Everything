@@ -139,12 +139,40 @@ public sealed partial class MainViewModel : ObservableObject
 
     [RelayCommand] private void OpenItem(SearchResultItem? item)
     {
-        if (item is not null) Process.Start(new ProcessStartInfo(item.FullPath) { UseShellExecute = true });
+        if (item is null) return;
+        try
+        {
+            if (!Path.Exists(item.FullPath))
+            {
+                StatusText = $"ファイルが見つかりません: {item.FullPath}";
+                return;
+            }
+            Process.Start(new ProcessStartInfo(item.FullPath) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"開けませんでした: {ex.Message}";
+            _ = _logger.ErrorAsync("検索結果を開けませんでした", ex);
+        }
     }
 
     [RelayCommand] private void OpenParent(SearchResultItem? item)
     {
-        if (item is not null) Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{item.FullPath}\"") { UseShellExecute = true });
+        if (item is null) return;
+        try
+        {
+            if (!Path.Exists(item.FullPath))
+            {
+                StatusText = $"ファイルが見つかりません: {item.FullPath}";
+                return;
+            }
+            Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{item.FullPath}\"") { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"親フォルダーを開けませんでした: {ex.Message}";
+            _ = _logger.ErrorAsync("親フォルダーを開けませんでした", ex);
+        }
     }
 
     [RelayCommand] private void CopyPath(SearchResultItem? item)
