@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using LLM2Everything.App.Services;
 using LLM2Everything.Core;
 using LLM2Everything.Infrastructure;
 
@@ -169,13 +170,7 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanOperate))]
     private async Task AddFolderAsync()
     {
-        var dialog = new Microsoft.Win32.OpenFolderDialog
-        {
-            Title = "検索対象フォルダーを選択",
-            Multiselect = true
-        };
-        if (dialog.ShowDialog() != true) return;
-        foreach (var folder in dialog.FolderNames)
+        foreach (var folder in ExplorerFolderPicker.PickFolders(Application.Current.MainWindow, "検索対象フォルダーを選択"))
             await AddSelectedFolderAsync(folder);
     }
 
