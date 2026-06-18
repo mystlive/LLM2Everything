@@ -5,7 +5,6 @@ using System.Text.Json;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using LLM2Everything.App.Services;
 using LLM2Everything.Core;
 using LLM2Everything.Infrastructure;
 
@@ -38,20 +37,14 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool isDetailVisible;
     [ObservableProperty] private FileTypeModeOption selectedFileTypeModeOption;
     [ObservableProperty] private FileTypeDefinition? selectedFileType;
-    [ObservableProperty] private string? selectedFolder;
-    [ObservableProperty] private string? selectedRegisteredFolder;
-    [ObservableProperty] private bool isWholeSearch = true;
     [ObservableProperty] private string elapsedText = "";
     [ObservableProperty] private string warningText = "";
 
     public ObservableCollection<SearchResultItem> Results { get; } = [];
     public ObservableCollection<HistoryEntry> History { get; } = [];
     public ObservableCollection<FileTypeDefinition> FileTypes { get; } = [];
-    public ObservableCollection<string> SelectedFolders { get; } = [];
-    public ObservableCollection<string> RegisteredFolders { get; } = [];
     public bool IsFileTypeSelectionEnabled => !IsBusy && SelectedFileTypeModeOption.Value == FileTypeMode.FileType;
     public bool IsExtensionSelectionEnabled => !IsBusy && SelectedFileTypeModeOption.Value == FileTypeMode.Extension;
-    public bool IsFolderSelectionEnabled => !IsBusy && !IsWholeSearch;
     public IReadOnlyList<FileTypeModeOption> FileTypeModeOptions { get; } =
     [
         new("指定なし", FileTypeMode.None),
@@ -81,7 +74,6 @@ public sealed partial class MainViewModel : ObservableObject
         if (_fileTypes.Count == 0) _fileTypes = DefaultFileTypes.Create();
         FileTypes.Clear();
         foreach (var ft in _fileTypes) FileTypes.Add(ft);
-        LoadRegisteredFolders();
         foreach (var h in await _historyRepository.LoadAsync()) History.Add(h);
         RefreshStaticWarnings();
         StatusText = "待機中";
@@ -135,20 +127,12 @@ public sealed partial class MainViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(IsFileTypeSelectionEnabled));
         OnPropertyChanged(nameof(IsExtensionSelectionEnabled));
-        OnPropertyChanged(nameof(IsFolderSelectionEnabled));
     }
 
     partial void OnIsBusyChanged(bool value)
     {
         OnPropertyChanged(nameof(IsFileTypeSelectionEnabled));
         OnPropertyChanged(nameof(IsExtensionSelectionEnabled));
-        OnPropertyChanged(nameof(IsFolderSelectionEnabled));
-    }
-
-    partial void OnIsWholeSearchChanged(bool value)
-    {
-        OnPropertyChanged(nameof(IsFolderSelectionEnabled));
-        SyncFolderText();
     }
 
     [RelayCommand(CanExecute = nameof(CanOperate))]
@@ -162,32 +146,8 @@ public sealed partial class MainViewModel : ObservableObject
         _fileTypes = (await _fileTypeRepository.LoadAsync()).ToList();
         FileTypes.Clear();
         foreach (var ft in _fileTypes) FileTypes.Add(ft);
-        LoadRegisteredFolders();
         RefreshStaticWarnings();
         _ = CheckOllamaAvailabilityAsync();
-    }
-
-    [RelayCommand(CanExecute = nameof(CanOperate))]
-    private async Task AddFolderAsync()
-    {
-        foreach (var folder in ExplorerFolderPicker.PickFolders(Application.Current.MainWindow, "検索対象フォルダーを選択"))
-            await AddSelectedFolderAsync(folder);
-    }
-
-    [RelayCommand(CanExecute = nameof(CanOperate))]
-    private async Task AddRegisteredFolderAsync()
-    {
-        if (!string.IsNullOrWhiteSpace(SelectedRegisteredFolder))
-            await AddSelectedFolderAsync(SelectedRegisteredFolder);
-    }
-
-    [RelayCommand(CanExecute = nameof(CanOperate))]
-    private void RemoveSelectedFolder()
-    {
-        if (SelectedFolder is null) return;
-        SelectedFolders.Remove(SelectedFolder);
-        IsWholeSearch = SelectedFolders.Count == 0;
-        SyncFolderText();
     }
 
     [RelayCommand] private void OpenItem(SearchResultItem? item)
@@ -238,7 +198,7 @@ public sealed partial class MainViewModel : ObservableObject
         if (entry is null) return;
         SearchText = entry.Input;
         EditableEverythingQuery = entry.EverythingQuery;
-        RestoreHistoryFolders(entry.SelectedFolders);
+        FolderText = string.Join("; ", entry.SelectedFolders);
         _cts = new CancellationTokenSource();
         await RunSearchPipelineAsync(_cts.Token);
     }
@@ -361,7 +321,7 @@ public sealed partial class MainViewModel : ObservableObject
             response.LimitReached,
             HasAppSideFilters = hasAppSideFilters
         }, new JsonSerializerOptions { WriteIndented = true });
-        var history = History.Prepend(new HistoryEntry { Input = SearchText, SelectedFolders = GetSelectedFolders().ToList(), FileTypes = SelectedFileType is null ? [] : [SelectedFileType.Name], Extensions = SplitExtensions().ToList(), EverythingQuery = query, ExecutedAt = DateTimeOffset.Now, ResultCount = filteredResults.Count, Method = method }).Take(20).ToList();
+        var history = History.Prepend(new HistoryEntry { Input = SearchText, SelectedFolders = SplitFolders().ToList(), FileTypes = SelectedFileType is null ? [] : [SelectedFileType.Name], Extensions = SplitExtensions().ToList(), EverythingQuery = query, ExecutedAt = DateTimeOffset.Now, ResultCount = filteredResults.Count, Method = method }).Take(20).ToList();
         History.Clear();
         foreach (var entry in history) History.Add(entry);
         await _historyRepository.SaveAsync(history, token);
@@ -370,7 +330,7 @@ public sealed partial class MainViewModel : ObservableObject
     private SearchInput CreateInput() => new()
     {
         Text = SearchText,
-        SelectedFolders = GetSelectedFolders().ToList(),
+        SelectedFolders = SplitFolders().ToList(),
         FileTypeMode = SelectedFileTypeModeOption.Value,
         SelectedFileTypes = SelectedFileType is null ? [] : [SelectedFileType.Name],
         SelectedExtensions = SplitExtensions().ToList(),
@@ -380,8 +340,7 @@ public sealed partial class MainViewModel : ObservableObject
         ModelName = _settings.OllamaModel
     };
 
-    private IEnumerable<string> GetSelectedFolders() => IsWholeSearch ? [] : SelectedFolders.Where(Directory.Exists);
-    private IEnumerable<string> SplitFolders() => FolderText.Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+    private IEnumerable<string> SplitFolders() => FolderText.Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Where(Directory.Exists);
     private IEnumerable<string> SplitExtensions() => ExtensionText.Split([',', ';', ' ', '　'], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Select(DefaultFileTypes.NormalizeExtension).Where(e => e.Length > 0);
     private void SetBusy(string status, TimeSpan timeout) { IsBusy = true; StatusText = status; ElapsedText = $"0秒経過 / 残り{(int)timeout.TotalSeconds}秒"; }
     private void ResetBusyState()
@@ -392,9 +351,6 @@ public sealed partial class MainViewModel : ObservableObject
         SearchCommand.NotifyCanExecuteChanged();
         SearchEditedQueryCommand.NotifyCanExecuteChanged();
         OpenSettingsCommand.NotifyCanExecuteChanged();
-        AddFolderCommand.NotifyCanExecuteChanged();
-        AddRegisteredFolderCommand.NotifyCanExecuteChanged();
-        RemoveSelectedFolderCommand.NotifyCanExecuteChanged();
     }
     private static bool HasAppSideFilters(SearchIntent intent) =>
         intent.Modified.Start is not null || intent.Modified.End is not null;
@@ -422,45 +378,6 @@ public sealed partial class MainViewModel : ObservableObject
     private static string AppendWarning(string current, string message) =>
         string.IsNullOrWhiteSpace(current) ? message : current.Contains(message, StringComparison.Ordinal) ? current : $"{current} {message}";
 
-    private async Task AddSelectedFolderAsync(string folder)
-    {
-        var normalized = Path.GetFullPath(folder.Trim());
-        if (!Directory.Exists(normalized))
-        {
-            StatusText = $"フォルダーが見つかりません: {normalized}";
-            return;
-        }
-
-        IsWholeSearch = false;
-        if (!SelectedFolders.Contains(normalized, StringComparer.OrdinalIgnoreCase))
-            SelectedFolders.Add(normalized);
-        if (!RegisteredFolders.Contains(normalized, StringComparer.OrdinalIgnoreCase))
-        {
-            RegisteredFolders.Add(normalized);
-            _settings.RegisteredFolders = RegisteredFolders.ToList();
-            await _settingsRepository.SaveAsync(_settings);
-        }
-        SyncFolderText();
-    }
-
-    private void LoadRegisteredFolders()
-    {
-        RegisteredFolders.Clear();
-        foreach (var folder in _settings.RegisteredFolders.Where(Directory.Exists).Distinct(StringComparer.OrdinalIgnoreCase))
-            RegisteredFolders.Add(folder);
-    }
-
-    private void RestoreHistoryFolders(IReadOnlyList<string> folders)
-    {
-        SelectedFolders.Clear();
-        foreach (var folder in folders.Where(Directory.Exists).Distinct(StringComparer.OrdinalIgnoreCase))
-            SelectedFolders.Add(folder);
-        IsWholeSearch = SelectedFolders.Count == 0;
-        SyncFolderText();
-    }
-
-    private void SyncFolderText() =>
-        FolderText = IsWholeSearch ? "" : string.Join("; ", SelectedFolders);
 }
 
 public sealed record FileTypeModeOption(string Label, FileTypeMode Value);
