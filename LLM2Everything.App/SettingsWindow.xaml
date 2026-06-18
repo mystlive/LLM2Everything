@@ -1,0 +1,44 @@
+<Window x:Class="LLM2Everything.App.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="設定" Height="620" Width="760">
+    <ScrollViewer>
+        <StackPanel Margin="12">
+            <TextBlock Text="{Binding StatusText}" Foreground="#2563EB" Margin="4"/>
+            <Button Content="自動検出" Command="{Binding AutoDetectCommand}" HorizontalAlignment="Left"/>
+            <TextBlock Text="Ollama URL"/>
+            <TextBox Text="{Binding Settings.OllamaUrl, UpdateSourceTrigger=PropertyChanged}"/>
+            <TextBlock Text="Ollamaモデル"/>
+            <DockPanel>
+                <TextBox Text="{Binding Settings.OllamaModel, UpdateSourceTrigger=PropertyChanged}" MinWidth="360"/>
+                <Button Content="モデル一覧取得" Command="{Binding LoadModelsCommand}"/>
+            </DockPanel>
+            <ComboBox ItemsSource="{Binding Models}" SelectedItem="{Binding Settings.OllamaModel}"/>
+            <TextBlock Text="Ollamaタイムアウト秒"/>
+            <TextBox Text="{Binding Settings.OllamaTimeoutSeconds, UpdateSourceTrigger=PropertyChanged}"/>
+            <TextBlock Text="es.exe パス"/>
+            <TextBox Text="{Binding Settings.EsExePath, UpdateSourceTrigger=PropertyChanged}"/>
+            <TextBlock Text="Everything.exe パス"/>
+            <TextBox Text="{Binding Settings.EverythingPath, UpdateSourceTrigger=PropertyChanged}"/>
+            <TextBlock Text="Everything検索タイムアウト秒"/>
+            <TextBox Text="{Binding Settings.EverythingTimeoutSeconds, UpdateSourceTrigger=PropertyChanged}"/>
+            <TextBlock Text="検索結果上限"/>
+            <TextBox Text="{Binding Settings.ResultLimit, UpdateSourceTrigger=PropertyChanged}"/>
+            <TextBlock Text="タイムゾーン"/>
+            <TextBox Text="{Binding Settings.TimeZoneId, UpdateSourceTrigger=PropertyChanged}"/>
+            <CheckBox Content="診断モード" IsChecked="{Binding Settings.DiagnosticMode}"/>
+            <GroupBox Header="ファイルタイプ定義">
+                <DataGrid ItemsSource="{Binding FileTypes}" AutoGenerateColumns="False" Height="180">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="名前" Binding="{Binding Name}" Width="160"/>
+                        <DataGridTextColumn Header="拡張子" Binding="{Binding Extensions}" Width="*"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </GroupBox>
+            <StackPanel Orientation="Horizontal">
+                <Button Content="保存" Command="{Binding SaveCommand}"/>
+                <Button Content="ログフォルダーを開く" Command="{Binding OpenLogFolderCommand}"/>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</Window>

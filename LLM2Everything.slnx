@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="LLM2Everything.App/LLM2Everything.App.csproj" />
+  <Project Path="LLM2Everything.Core/LLM2Everything.Core.csproj" />
+  <Project Path="LLM2Everything.Infrastructure/LLM2Everything.Infrastructure.csproj" />
+  <Project Path="LLM2Everything.Tests/LLM2Everything.Tests.csproj" />
+</Solution>
