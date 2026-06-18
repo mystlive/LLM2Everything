@@ -100,7 +100,7 @@ public sealed class EsExeSearchService : IEverythingSearchService
         sw.Stop();
 
         var lines = (await stdoutTask).Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries);
-        var results = lines.Select(ParseLine).Where(r => r is not null).Cast<SearchResultItem>().ToList();
+        var results = lines.Select(ParseOutputLine).Where(r => r is not null).Cast<SearchResultItem>().ToList();
         return new EsSearchResponse
         {
             Results = results,
@@ -135,7 +135,7 @@ public sealed class EsExeSearchService : IEverythingSearchService
         return response.ExitCode == 0;
     }
 
-    private static SearchResultItem? ParseLine(string line)
+    public static SearchResultItem? ParseOutputLine(string line)
     {
         if (string.IsNullOrWhiteSpace(line)) return null;
         var match = Regex.Match(line, @"^(?<date>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})\s+(?:(?<size>[\d,]+)\s+)?(?<path>[A-Za-z]:\\.+|\\\\.+)$");

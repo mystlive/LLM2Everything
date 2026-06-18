@@ -19,6 +19,8 @@ var tests = new List<(string Name, Func<Task> Body)>
     ("検索式: 日本語パスと空白", () => QueryAssert(i => i.TargetFolders.Add(@"D:\日本語 パス"), q => q.Contains("path:\"D:\\日本語 パス\""))),
     ("検索式: 引用符と除外", () => QueryAssert(i => i.ExcludeTerms.Add("bad name"), q => q.Contains("!\"bad name\""))),
     ("検索式: 拡張子複数", () => QueryAssert(i => { i.Extensions.Add("pdf"); i.Extensions.Add("docx"); }, q => q.Contains("<ext:docx|ext:pdf>") || q.Contains("<ext:pdf|ext:docx>"))),
+    ("検索式: 日付フィルター除外", QueryDateFilterAssert),
+    ("es.exe: 日時サイズ付き日本語パス", EsOutputParseAssert),
     ("保存: 履歴20件上限", HistoryLimitAssert),
     ("保存: キャッシュ100件上限", CacheLimitAssert),
     ("保存: JSON破損バックアップ復旧", BackupAssert)
@@ -87,21 +89,25 @@ static Task QueryAssert(Action<SearchIntent> arrange, Func<string, bool> asserti
 static async Task HistoryLimitAssert()
 {
     var temp = NewTempRoot();
-    Environment.SetEnvironmentVariable("LLM2EVERYTHING_DATA_DIR", temp);
-    var repo = new HistoryRepository(new JsonAtomicFileStore());
-    await repo.SaveAsync(Enumerable.Range(0, 25).Select(i => new HistoryEntry { Input = i.ToString() }).ToList());
-    var loaded = await repo.LoadAsync();
-    if (loaded.Count != 20) throw new InvalidOperationException($"count={loaded.Count}");
+    await WithDataDirAsync(temp, async () =>
+    {
+        var repo = new HistoryRepository(new JsonAtomicFileStore());
+        await repo.SaveAsync(Enumerable.Range(0, 25).Select(i => new HistoryEntry { Input = i.ToString() }).ToList());
+        var loaded = await repo.LoadAsync();
+        if (loaded.Count != 20) throw new InvalidOperationException($"count={loaded.Count}");
+    });
 }
 
 static async Task CacheLimitAssert()
 {
     var temp = NewTempRoot();
-    Environment.SetEnvironmentVariable("LLM2EVERYTHING_DATA_DIR", temp);
-    var repo = new CacheRepository(new JsonAtomicFileStore());
-    await repo.SaveAsync(Enumerable.Range(0, 120).Select(i => new CacheEntry { Key = i.ToString() }).ToList());
-    var loaded = await repo.LoadAsync();
-    if (loaded.Count != 100) throw new InvalidOperationException($"count={loaded.Count}");
+    await WithDataDirAsync(temp, async () =>
+    {
+        var repo = new CacheRepository(new JsonAtomicFileStore());
+        await repo.SaveAsync(Enumerable.Range(0, 120).Select(i => new CacheEntry { Key = i.ToString() }).ToList());
+        var loaded = await repo.LoadAsync();
+        if (loaded.Count != 100) throw new InvalidOperationException($"count={loaded.Count}");
+    });
 }
 
 static async Task BackupAssert()
@@ -121,4 +127,53 @@ static string NewTempRoot()
     var root = Path.Combine(Path.GetTempPath(), "LLM2EverythingTests", Guid.NewGuid().ToString("N"));
     Directory.CreateDirectory(root);
     return root;
+}
+
+static Task QueryDateFilterAssert()
+{
+    var intent = new SearchIntent
+    {
+        Modified = new DateRange(
+            new DateTimeOffset(2026, 6, 17, 0, 0, 0, TimeSpan.FromHours(9)),
+            new DateTimeOffset(2026, 6, 17, 23, 59, 59, TimeSpan.FromHours(9)))
+    };
+    intent.Extensions.Add("xlsx");
+    var builder = new EverythingQueryBuilder();
+    var displayQuery = builder.Build(intent, DefaultFileTypes.Create());
+    var executableQuery = builder.Build(intent, DefaultFileTypes.Create(), includeDateFilters: false);
+    if (!displayQuery.Contains("dm:>=") || !displayQuery.Contains("dm:<="))
+        throw new InvalidOperationException(displayQuery);
+    if (executableQuery.Contains("dm:", StringComparison.Ordinal))
+        throw new InvalidOperationException(executableQuery);
+    if (!executableQuery.Contains("ext:xlsx", StringComparison.Ordinal))
+        throw new InvalidOperationException(executableQuery);
+    return Task.CompletedTask;
+}
+
+static Task EsOutputParseAssert()
+{
+    var line = @"2026-06-17T14:58:11      59,686 D:\Users\mystl\Downloads\ジェイネッツ一括導入_検討資料_202606.xlsx";
+    var item = EsExeSearchService.ParseOutputLine(line);
+    if (item is null) throw new InvalidOperationException("line was not parsed");
+    if (item.FullPath != @"D:\Users\mystl\Downloads\ジェイネッツ一括導入_検討資料_202606.xlsx")
+        throw new InvalidOperationException(item.FullPath);
+    if (item.SizeBytes != 59686)
+        throw new InvalidOperationException($"size={item.SizeBytes}");
+    if (item.ModifiedAt?.Year != 2026 || item.ModifiedAt?.Month != 6 || item.ModifiedAt?.Day != 17)
+        throw new InvalidOperationException($"modified={item.ModifiedAt}");
+    return Task.CompletedTask;
+}
+
+static async Task WithDataDirAsync(string path, Func<Task> body)
+{
+    var previous = Environment.GetEnvironmentVariable("LLM2EVERYTHING_DATA_DIR");
+    Environment.SetEnvironmentVariable("LLM2EVERYTHING_DATA_DIR", path);
+    try
+    {
+        await body();
+    }
+    finally
+    {
+        Environment.SetEnvironmentVariable("LLM2EVERYTHING_DATA_DIR", previous);
+    }
 }
