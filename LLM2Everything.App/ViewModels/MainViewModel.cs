@@ -84,7 +84,7 @@ public sealed partial class MainViewModel : ObservableObject
         try
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-            await _ollamaClient.GetModelsAsync(cts.Token);
+            await _ollamaClient.GetModelsAsync(_settings.OllamaUrl, cts.Token);
         }
         catch
         {

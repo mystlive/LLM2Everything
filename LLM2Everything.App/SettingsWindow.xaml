@@ -3,7 +3,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="設定" Height="660" Width="820" MinHeight="620" MinWidth="760" Background="#F7F7F8">
     <DockPanel Margin="14">
-        <Border DockPanel.Dock="Top" Background="White" BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="4" Padding="10" Margin="0,0,0,10">
+        <Border DockPanel.Dock="Top" Background="White" BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="4" Padding="10" Margin="0,0,0,10"
+                Visibility="{Binding StatusText, Converter={StaticResource StringNotEmptyToVisibilityConverter}}">
             <DockPanel>
                 <Button DockPanel.Dock="Right" Content="自動検出" Command="{Binding AutoDetectCommand}" MinWidth="88"/>
                 <TextBlock Text="{Binding StatusText}" Foreground="#1D4ED8" TextWrapping="Wrap" VerticalAlignment="Center"/>
@@ -23,6 +24,7 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
                         <TextBlock Grid.Row="0" Grid.Column="0" Text="es.exe パス" VerticalAlignment="Center"/>
                         <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding Settings.EsExePath, UpdateSourceTrigger=PropertyChanged}"/>
@@ -34,6 +36,7 @@
 
                         <TextBlock Grid.Row="2" Grid.Column="0" Text="検索タイムアウト秒" VerticalAlignment="Center"/>
                         <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Settings.EverythingTimeoutSeconds, UpdateSourceTrigger=PropertyChanged}"/>
+                        <Button Grid.Row="3" Grid.Column="2" Content="確認" Command="{Binding TestEverythingCommand}" MinWidth="70"/>
                     </Grid>
                 </GroupBox>
 
@@ -45,6 +48,7 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
@@ -62,6 +66,7 @@
 
                         <TextBlock Grid.Row="3" Grid.Column="0" Text="タイムアウト秒" VerticalAlignment="Center"/>
                         <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding Settings.OllamaTimeoutSeconds, UpdateSourceTrigger=PropertyChanged}"/>
+                        <Button Grid.Row="4" Grid.Column="2" Content="接続確認" Command="{Binding TestOllamaCommand}" MinWidth="90"/>
                     </Grid>
                 </GroupBox>
 

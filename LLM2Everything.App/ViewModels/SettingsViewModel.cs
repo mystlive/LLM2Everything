@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LLM2Everything.Core;
@@ -77,13 +78,50 @@ public sealed partial class SettingsViewModel : ObservableObject
         try
         {
             Models.Clear();
-            foreach (var model in await _ollamaClient.GetModelsAsync(CancellationToken.None)) Models.Add(model);
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(Settings.OllamaTimeoutSeconds));
+            foreach (var model in await _ollamaClient.GetModelsAsync(Settings.OllamaUrl, cts.Token)) Models.Add(model);
             StatusText = $"{Models.Count}件のモデルを取得しました。";
         }
         catch (Exception ex)
         {
             StatusText = "Ollama接続に失敗しました: " + ex.Message;
             await _logger.ErrorAsync("Ollamaモデル取得失敗", ex);
+        }
+    }
+
+    [RelayCommand] private async Task TestEverythingAsync()
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(Settings.EsExePath) || !File.Exists(Settings.EsExePath))
+            {
+                StatusText = "es.exe が見つかりません。参照または自動検出で設定してください。";
+                return;
+            }
+            var service = new EsExeSearchService(() => Settings.EsExePath);
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            var version = await service.GetVersionAsync(cts.Token);
+            StatusText = string.IsNullOrWhiteSpace(version) ? "es.exe を確認しました。" : $"es.exe を確認しました: {version}";
+        }
+        catch (Exception ex)
+        {
+            StatusText = "es.exe 確認に失敗しました: " + ex.Message;
+            await _logger.ErrorAsync("es.exe確認失敗", ex);
+        }
+    }
+
+    [RelayCommand] private async Task TestOllamaAsync()
+    {
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(Settings.OllamaTimeoutSeconds));
+            var models = await _ollamaClient.GetModelsAsync(Settings.OllamaUrl, cts.Token);
+            StatusText = $"Ollama に接続できました。モデル数: {models.Count}";
+        }
+        catch (Exception ex)
+        {
+            StatusText = "Ollama接続に失敗しました: " + ex.Message;
+            await _logger.ErrorAsync("Ollama接続テスト失敗", ex);
         }
     }
 

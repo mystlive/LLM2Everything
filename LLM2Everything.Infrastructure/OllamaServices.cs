@@ -10,7 +10,12 @@ public sealed class OllamaClient : IOllamaClient
 
     public async Task<IReadOnlyList<string>> GetModelsAsync(CancellationToken cancellationToken)
     {
-        var response = await _http.GetFromJsonAsync<OllamaTagsResponse>("http://localhost:11434/api/tags", cancellationToken);
+        return await GetModelsAsync("http://localhost:11434", cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<string>> GetModelsAsync(string url, CancellationToken cancellationToken)
+    {
+        var response = await _http.GetFromJsonAsync<OllamaTagsResponse>(url.TrimEnd('/') + "/api/tags", cancellationToken);
         return response?.Models.Select(m => m.Name).ToList() ?? [];
     }
 

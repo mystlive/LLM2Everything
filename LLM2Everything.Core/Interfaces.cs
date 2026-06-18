@@ -40,6 +40,7 @@ public interface IEverythingInstallationDetector
 public interface IOllamaClient
 {
     Task<IReadOnlyList<string>> GetModelsAsync(CancellationToken cancellationToken);
+    Task<IReadOnlyList<string>> GetModelsAsync(string url, CancellationToken cancellationToken);
     Task<string> GenerateAsync(OllamaGenerateRequest request, CancellationToken cancellationToken);
 }
 
