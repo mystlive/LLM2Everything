@@ -246,7 +246,20 @@ public sealed partial class MainViewModel : ObservableObject
         var response = await _searchService.SearchAsync(new EsSearchRequest { Query = query, Limit = _settings.ResultLimit, Timeout = TimeSpan.FromSeconds(_settings.EverythingTimeoutSeconds) }, token);
         Results.Clear();
         foreach (var item in response.Results) Results.Add(item);
-        StatusText = response.LimitReached ? $"{response.Results.Count}件以上の結果があります。表示件数を制限しています。" : $"{response.Results.Count}件見つかりました。";
+        if (response.ExitCode != 0)
+            StatusText = $"es.exe が終了コード {response.ExitCode} を返しました。詳細を確認してください。";
+        else
+            StatusText = response.LimitReached ? $"{response.Results.Count}件以上の結果があります。表示件数を制限しています。" : $"{response.Results.Count}件見つかりました。";
+        DetailText = JsonSerializer.Serialize(new
+        {
+            query,
+            method,
+            response.ExitCode,
+            response.StandardError,
+            response.Elapsed,
+            ResultCount = response.Results.Count,
+            response.LimitReached
+        }, new JsonSerializerOptions { WriteIndented = true });
         var history = History.Prepend(new HistoryEntry { Input = SearchText, SelectedFolders = SplitFolders().ToList(), FileTypes = SelectedFileType is null ? [] : [SelectedFileType.Name], Extensions = SplitExtensions().ToList(), EverythingQuery = query, ExecutedAt = DateTimeOffset.Now, ResultCount = response.Results.Count, Method = method }).Take(20).ToList();
         History.Clear();
         foreach (var entry in history) History.Add(entry);

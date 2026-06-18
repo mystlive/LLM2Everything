@@ -70,6 +70,7 @@ public sealed class EsExeSearchService : IEverythingSearchService
         using var process = new Process();
         process.StartInfo = new ProcessStartInfo(exe)
         {
+            CreateNoWindow = true,
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
@@ -107,6 +108,7 @@ public sealed class EsExeSearchService : IEverythingSearchService
         if (string.IsNullOrWhiteSpace(exe) || !File.Exists(exe)) return "";
         using var process = Process.Start(new ProcessStartInfo(exe)
         {
+            CreateNoWindow = true,
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
