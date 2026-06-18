@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.IO;
 using System.Text.Json;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -74,7 +75,7 @@ public sealed partial class MainViewModel : ObservableObject
         FileTypes.Clear();
         foreach (var ft in _fileTypes) FileTypes.Add(ft);
         foreach (var h in await _historyRepository.LoadAsync()) History.Add(h);
-        WarningText = string.IsNullOrWhiteSpace(_settings.EsExePath) ? "es.exe が未設定です。設定画面で指定してください。" : "";
+        RefreshStaticWarnings();
         StatusText = "待機中";
         _ = CheckOllamaAvailabilityAsync();
     }
@@ -122,13 +123,18 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand(CanExecute = nameof(CanOperate))]
-    private void OpenSettings()
+    private async Task OpenSettingsAsync()
     {
         var vm = new SettingsViewModel(_settings, _settingsRepository, _fileTypeRepository, _detector, _ollamaClient, _logger);
         var window = new SettingsWindow { DataContext = vm, Owner = Application.Current.MainWindow };
         window.ShowDialog();
-        _settings = vm.Settings;
+        _settings = await _settingsRepository.LoadAsync();
         _searchService = new EsExeSearchService(() => _settings.EsExePath);
+        _fileTypes = (await _fileTypeRepository.LoadAsync()).ToList();
+        FileTypes.Clear();
+        foreach (var ft in _fileTypes) FileTypes.Add(ft);
+        RefreshStaticWarnings();
+        _ = CheckOllamaAvailabilityAsync();
     }
 
     [RelayCommand] private void OpenItem(SearchResultItem? item)
@@ -263,6 +269,12 @@ public sealed partial class MainViewModel : ObservableObject
     private IEnumerable<string> SplitFolders() => FolderText.Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
     private IEnumerable<string> SplitExtensions() => ExtensionText.Split([',', ';', ' ', '　'], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Select(DefaultFileTypes.NormalizeExtension).Where(e => e.Length > 0);
     private void SetBusy(string status, TimeSpan timeout) { IsBusy = true; StatusText = status; ElapsedText = $"0秒経過 / 残り{(int)timeout.TotalSeconds}秒"; }
+    private void RefreshStaticWarnings()
+    {
+        WarningText = string.IsNullOrWhiteSpace(_settings.EsExePath) || !File.Exists(_settings.EsExePath)
+            ? "es.exe が未設定です。設定画面で指定してください。"
+            : "";
+    }
     private static string JstDateKey() => DateTimeOffset.Now.ToOffset(TimeSpan.FromHours(9)).ToString("yyyyMMdd");
     private static string CacheKey(SearchInput input) => JsonSerializer.Serialize(new { text = input.Text.Trim().ToLowerInvariant(), input.SelectedFolders, input.FileTypeMode, input.SelectedFileTypes, input.SelectedExtensions, input.TimeZoneId, ProductInfo.PromptVersion, input.ModelName });
     private static string AppendWarning(string current, string message) =>
