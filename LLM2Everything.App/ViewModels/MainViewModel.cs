@@ -75,9 +75,21 @@ public sealed partial class MainViewModel : ObservableObject
         foreach (var ft in _fileTypes) FileTypes.Add(ft);
         foreach (var h in await _historyRepository.LoadAsync()) History.Add(h);
         WarningText = string.IsNullOrWhiteSpace(_settings.EsExePath) ? "es.exe が未設定です。設定画面で指定してください。" : "";
-        try { await _ollamaClient.GetModelsAsync(CancellationToken.None); }
-        catch { WarningText = (WarningText + " Ollama に接続できません。高速ルールで確定できない検索は警告になります。").Trim(); }
         StatusText = "待機中";
+        _ = CheckOllamaAvailabilityAsync();
+    }
+
+    private async Task CheckOllamaAvailabilityAsync()
+    {
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+            await _ollamaClient.GetModelsAsync(cts.Token);
+        }
+        catch
+        {
+            WarningText = AppendWarning(WarningText, "Ollama に接続できません。高速ルールで確定できない検索は警告になります。");
+        }
     }
 
     [RelayCommand(CanExecute = nameof(CanOperate))]
@@ -253,6 +265,8 @@ public sealed partial class MainViewModel : ObservableObject
     private void SetBusy(string status, TimeSpan timeout) { IsBusy = true; StatusText = status; ElapsedText = $"0秒経過 / 残り{(int)timeout.TotalSeconds}秒"; }
     private static string JstDateKey() => DateTimeOffset.Now.ToOffset(TimeSpan.FromHours(9)).ToString("yyyyMMdd");
     private static string CacheKey(SearchInput input) => JsonSerializer.Serialize(new { text = input.Text.Trim().ToLowerInvariant(), input.SelectedFolders, input.FileTypeMode, input.SelectedFileTypes, input.SelectedExtensions, input.TimeZoneId, ProductInfo.PromptVersion, input.ModelName });
+    private static string AppendWarning(string current, string message) =>
+        string.IsNullOrWhiteSpace(current) ? message : current.Contains(message, StringComparison.Ordinal) ? current : $"{current} {message}";
 }
 
 public sealed record FileTypeModeOption(string Label, FileTypeMode Value);

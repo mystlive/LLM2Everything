@@ -132,10 +132,10 @@
                 <ListView.View>
                     <GridView>
                         <GridViewColumn Header="ファイル名" DisplayMemberBinding="{Binding FileName}" Width="210"/>
-                        <GridViewColumn Header="フルパス" DisplayMemberBinding="{Binding FullPath}" Width="390"/>
+                        <GridViewColumn Header="フルパス" DisplayMemberBinding="{Binding FullPath}" Width="370"/>
                         <GridViewColumn Header="拡張子" DisplayMemberBinding="{Binding Extension}" Width="70"/>
                         <GridViewColumn Header="サイズ" DisplayMemberBinding="{Binding SizeBytes}" Width="95"/>
-                        <GridViewColumn Header="更新日時" DisplayMemberBinding="{Binding ModifiedAt}" Width="145"/>
+                        <GridViewColumn Header="更新日時" DisplayMemberBinding="{Binding ModifiedAt}" Width="165"/>
                     </GridView>
                 </ListView.View>
             </ListView>
