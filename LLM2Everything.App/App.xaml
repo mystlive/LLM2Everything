@@ -5,6 +5,7 @@
              StartupUri="MainWindow.xaml">
     <Application.Resources>
         <conv:InverseBooleanConverter x:Key="InverseBooleanConverter"/>
+        <conv:StringNotEmptyToVisibilityConverter x:Key="StringNotEmptyToVisibilityConverter"/>
         <Style TargetType="Button">
             <Setter Property="Margin" Value="4"/>
             <Setter Property="Padding" Value="10,5"/>

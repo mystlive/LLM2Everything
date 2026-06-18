@@ -34,7 +34,7 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty] private string editableEverythingQuery = "";
     [ObservableProperty] private bool isBusy;
     [ObservableProperty] private bool isDetailVisible;
-    [ObservableProperty] private FileTypeMode selectedFileTypeMode = FileTypeMode.None;
+    [ObservableProperty] private FileTypeModeOption selectedFileTypeModeOption;
     [ObservableProperty] private FileTypeDefinition? selectedFileType;
     [ObservableProperty] private string elapsedText = "";
     [ObservableProperty] private string warningText = "";
@@ -42,10 +42,16 @@ public sealed partial class MainViewModel : ObservableObject
     public ObservableCollection<SearchResultItem> Results { get; } = [];
     public ObservableCollection<HistoryEntry> History { get; } = [];
     public ObservableCollection<FileTypeDefinition> FileTypes { get; } = [];
-    public IReadOnlyList<FileTypeMode> FileTypeModes { get; } = [FileTypeMode.None, FileTypeMode.FileType, FileTypeMode.Extension];
+    public IReadOnlyList<FileTypeModeOption> FileTypeModeOptions { get; } =
+    [
+        new("指定なし", FileTypeMode.None),
+        new("ファイルタイプ", FileTypeMode.FileType),
+        new("拡張子指定", FileTypeMode.Extension)
+    ];
 
     public MainViewModel(ISettingsRepository settingsRepository, IHistoryRepository historyRepository, ICacheRepository cacheRepository, IFileTypeRepository fileTypeRepository, IEverythingInstallationDetector detector, IEverythingProcessService processService, IOllamaClient ollamaClient)
     {
+        selectedFileTypeModeOption = FileTypeModeOptions[0];
         _settingsRepository = settingsRepository;
         _historyRepository = historyRepository;
         _cacheRepository = cacheRepository;
@@ -217,7 +223,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         Text = SearchText,
         SelectedFolders = SplitFolders().ToList(),
-        FileTypeMode = SelectedFileTypeMode,
+        FileTypeMode = SelectedFileTypeModeOption.Value,
         SelectedFileTypes = SelectedFileType is null ? [] : [SelectedFileType.Name],
         SelectedExtensions = SplitExtensions().ToList(),
         FileTypeDefinitions = _fileTypes,
@@ -232,3 +238,5 @@ public sealed partial class MainViewModel : ObservableObject
     private static string JstDateKey() => DateTimeOffset.Now.ToOffset(TimeSpan.FromHours(9)).ToString("yyyyMMdd");
     private static string CacheKey(SearchInput input) => JsonSerializer.Serialize(new { text = input.Text.Trim().ToLowerInvariant(), input.SelectedFolders, input.FileTypeMode, input.SelectedFileTypes, input.SelectedExtensions, input.TimeZoneId, ProductInfo.PromptVersion, input.ModelName });
 }
+
+public sealed record FileTypeModeOption(string Label, FileTypeMode Value);
