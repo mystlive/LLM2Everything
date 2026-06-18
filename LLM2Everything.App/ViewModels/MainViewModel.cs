@@ -39,6 +39,7 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty] private FileTypeDefinition? selectedFileType;
     [ObservableProperty] private string elapsedText = "";
     [ObservableProperty] private string warningText = "";
+    [ObservableProperty] private string folderScopeText = "Everything側の全インデックス対象";
 
     public ObservableCollection<SearchResultItem> Results { get; } = [];
     public ObservableCollection<HistoryEntry> History { get; } = [];
@@ -135,6 +136,8 @@ public sealed partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(IsExtensionSelectionEnabled));
     }
 
+    partial void OnFolderTextChanged(string value) => UpdateFolderScopeText();
+
     [RelayCommand(CanExecute = nameof(CanOperate))]
     private async Task OpenSettingsAsync()
     {
@@ -210,6 +213,7 @@ public sealed partial class MainViewModel : ObservableObject
         try
         {
             SetBusy("検索条件を解析中", TimeSpan.FromSeconds(_settings.OllamaTimeoutSeconds));
+            if (!ValidateFolderText()) return;
             var input = CreateInput();
             var cache = await _cacheRepository.LoadAsync(token);
             var key = CacheKey(input);
@@ -341,6 +345,7 @@ public sealed partial class MainViewModel : ObservableObject
     };
 
     private IEnumerable<string> SplitFolders() => FolderText.Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Where(Directory.Exists);
+    private IEnumerable<string> SplitFolderEntries() => FolderText.Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
     private IEnumerable<string> SplitExtensions() => ExtensionText.Split([',', ';', ' ', '　'], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Select(DefaultFileTypes.NormalizeExtension).Where(e => e.Length > 0);
     private void SetBusy(string status, TimeSpan timeout) { IsBusy = true; StatusText = status; ElapsedText = $"0秒経過 / 残り{(int)timeout.TotalSeconds}秒"; }
     private void ResetBusyState()
@@ -378,6 +383,21 @@ public sealed partial class MainViewModel : ObservableObject
     private static string AppendWarning(string current, string message) =>
         string.IsNullOrWhiteSpace(current) ? message : current.Contains(message, StringComparison.Ordinal) ? current : $"{current} {message}";
 
+    private bool ValidateFolderText()
+    {
+        var invalid = SplitFolderEntries().Where(folder => !Directory.Exists(folder)).ToList();
+        if (invalid.Count == 0) return true;
+        StatusText = $"存在しないフォルダー指定があります: {string.Join("; ", invalid)}";
+        return false;
+    }
+
+    private void UpdateFolderScopeText()
+    {
+        var entries = SplitFolderEntries().ToList();
+        FolderScopeText = entries.Count == 0
+            ? "Everything側の全インデックス対象"
+            : $"{entries.Count}件のフォルダーに限定";
+    }
 }
 
 public sealed record FileTypeModeOption(string Label, FileTypeMode Value);
