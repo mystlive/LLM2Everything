@@ -64,6 +64,7 @@ public sealed class AppSettings
     public bool DiagnosticMode { get; set; }
     public string? SortColumn { get; set; }
     public bool SortDescending { get; set; }
+    public List<string> RegisteredFolders { get; set; } = [];
 }
 
 public sealed class SearchResultItem
