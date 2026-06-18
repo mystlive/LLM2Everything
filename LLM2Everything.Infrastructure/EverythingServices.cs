@@ -1,5 +1,7 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Text;
+using System.Text.RegularExpressions;
 using LLM2Everything.Core;
 
 namespace LLM2Everything.Infrastructure;
@@ -82,6 +84,12 @@ public sealed class EsExeSearchService : IEverythingSearchService
             process.StartInfo.ArgumentList.Add("-n");
             process.StartInfo.ArgumentList.Add(request.Limit.Value.ToString());
         }
+        if (request.SortDateModifiedDescending)
+            process.StartInfo.ArgumentList.Add("-sort-date-modified-descending");
+        process.StartInfo.ArgumentList.Add("-dm");
+        process.StartInfo.ArgumentList.Add("-size");
+        process.StartInfo.ArgumentList.Add("-date-format");
+        process.StartInfo.ArgumentList.Add("1");
         process.StartInfo.ArgumentList.Add(request.Query);
 
         process.Start();
@@ -129,6 +137,25 @@ public sealed class EsExeSearchService : IEverythingSearchService
     private static SearchResultItem? ParseLine(string line)
     {
         if (string.IsNullOrWhiteSpace(line)) return null;
+        var match = Regex.Match(line, @"^(?<date>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})\s+(?:(?<size>[\d,]+)\s+)?(?<path>[A-Za-z]:\\.+|\\\\.+)$");
+        if (match.Success)
+        {
+            var path = match.Groups["path"].Value;
+            long? size = long.TryParse(match.Groups["size"].Value.Replace(",", ""), out var parsedSize) ? parsedSize : null;
+            DateTimeOffset? modified = DateTime.TryParseExact(match.Groups["date"].Value, "yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var parsedDate)
+                ? new DateTimeOffset(parsedDate)
+                : null;
+            return new SearchResultItem
+            {
+                FullPath = path,
+                FileName = Path.GetFileName(path),
+                Extension = Path.GetExtension(path).TrimStart('.').ToLowerInvariant(),
+                SizeBytes = size ?? (File.Exists(path) ? new FileInfo(path).Length : null),
+                ModifiedAt = modified ?? ((File.Exists(path) || Directory.Exists(path)) ? File.GetLastWriteTime(path) : null),
+                IsFolder = Directory.Exists(path)
+            };
+        }
+
         var ext = Path.GetExtension(line).TrimStart('.').ToLowerInvariant();
         return new SearchResultItem
         {

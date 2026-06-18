@@ -205,7 +205,7 @@ public sealed partial class MainViewModel : ObservableObject
                 StatusText = string.IsNullOrWhiteSpace(result.Intent.UserReason) ? "ファイル検索条件として解釈できませんでした。" : result.Intent.UserReason;
                 return;
             }
-            await ExecuteEverythingAsync(result.EverythingQuery, result.Method, token);
+            await ExecuteEverythingAsync(result.EverythingQuery, result.Method, token, result.Intent);
         }
         catch (OperationCanceledException) { StatusText = "キャンセルしました。"; }
         catch (Exception ex)
@@ -224,7 +224,7 @@ public sealed partial class MainViewModel : ObservableObject
         }
     }
 
-    private async Task ExecuteEverythingAsync(string query, ParseMethod method, CancellationToken token)
+    private async Task ExecuteEverythingAsync(string query, ParseMethod method, CancellationToken token, SearchIntent? intent = null)
     {
         if (_searchService is null) return;
         if (!_processService.IsEverythingRunning())
@@ -243,24 +243,41 @@ public sealed partial class MainViewModel : ObservableObject
             await _processService.StartEverythingAsync(_settings.EverythingPath, token);
         }
         SetBusy("es.exeで検索中", TimeSpan.FromSeconds(_settings.EverythingTimeoutSeconds));
-        var response = await _searchService.SearchAsync(new EsSearchRequest { Query = query, Limit = _settings.ResultLimit, Timeout = TimeSpan.FromSeconds(_settings.EverythingTimeoutSeconds) }, token);
+        var hasAppSideFilters = intent is not null && HasAppSideFilters(intent);
+        var executableQuery = hasAppSideFilters ? _queryBuilder.Build(intent!, _fileTypes, includeDateFilters: false) : query;
+        var rawLimit = hasAppSideFilters && _settings.ResultLimit is > 0
+            ? Math.Max(_settings.ResultLimit.Value, 10000)
+            : _settings.ResultLimit;
+        var response = await _searchService.SearchAsync(new EsSearchRequest
+        {
+            Query = executableQuery,
+            Limit = rawLimit,
+            Timeout = TimeSpan.FromSeconds(_settings.EverythingTimeoutSeconds),
+            SortDateModifiedDescending = hasAppSideFilters
+        }, token);
+        var filteredResults = hasAppSideFilters ? ApplyAppSideFilters(response.Results, intent!) : response.Results;
+        if (_settings.ResultLimit is > 0)
+            filteredResults = filteredResults.Take(_settings.ResultLimit.Value).ToList();
         Results.Clear();
-        foreach (var item in response.Results) Results.Add(item);
+        foreach (var item in filteredResults) Results.Add(item);
         if (response.ExitCode != 0)
             StatusText = $"es.exe が終了コード {response.ExitCode} を返しました。詳細を確認してください。";
         else
-            StatusText = response.LimitReached ? $"{response.Results.Count}件以上の結果があります。表示件数を制限しています。" : $"{response.Results.Count}件見つかりました。";
+            StatusText = response.LimitReached ? $"{filteredResults.Count}件以上の結果があります。表示件数を制限しています。" : $"{filteredResults.Count}件見つかりました。";
         DetailText = JsonSerializer.Serialize(new
         {
             query,
+            executableQuery,
             method,
             response.ExitCode,
             response.StandardError,
             response.Elapsed,
-            ResultCount = response.Results.Count,
-            response.LimitReached
+            RawResultCount = response.Results.Count,
+            ResultCount = filteredResults.Count,
+            response.LimitReached,
+            HasAppSideFilters = hasAppSideFilters
         }, new JsonSerializerOptions { WriteIndented = true });
-        var history = History.Prepend(new HistoryEntry { Input = SearchText, SelectedFolders = SplitFolders().ToList(), FileTypes = SelectedFileType is null ? [] : [SelectedFileType.Name], Extensions = SplitExtensions().ToList(), EverythingQuery = query, ExecutedAt = DateTimeOffset.Now, ResultCount = response.Results.Count, Method = method }).Take(20).ToList();
+        var history = History.Prepend(new HistoryEntry { Input = SearchText, SelectedFolders = SplitFolders().ToList(), FileTypes = SelectedFileType is null ? [] : [SelectedFileType.Name], Extensions = SplitExtensions().ToList(), EverythingQuery = query, ExecutedAt = DateTimeOffset.Now, ResultCount = filteredResults.Count, Method = method }).Take(20).ToList();
         History.Clear();
         foreach (var entry in history) History.Add(entry);
         await _historyRepository.SaveAsync(history, token);
@@ -282,6 +299,21 @@ public sealed partial class MainViewModel : ObservableObject
     private IEnumerable<string> SplitFolders() => FolderText.Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
     private IEnumerable<string> SplitExtensions() => ExtensionText.Split([',', ';', ' ', '　'], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Select(DefaultFileTypes.NormalizeExtension).Where(e => e.Length > 0);
     private void SetBusy(string status, TimeSpan timeout) { IsBusy = true; StatusText = status; ElapsedText = $"0秒経過 / 残り{(int)timeout.TotalSeconds}秒"; }
+    private static bool HasAppSideFilters(SearchIntent intent) =>
+        intent.Modified.Start is not null || intent.Modified.End is not null;
+
+    private static List<SearchResultItem> ApplyAppSideFilters(IEnumerable<SearchResultItem> results, SearchIntent intent) =>
+        results.Where(item =>
+        {
+            if (intent.Modified.Start is not null || intent.Modified.End is not null)
+            {
+                if (item.ModifiedAt is null) return false;
+                if (intent.Modified.Start is not null && item.ModifiedAt.Value < intent.Modified.Start.Value) return false;
+                if (intent.Modified.End is not null && item.ModifiedAt.Value > intent.Modified.End.Value) return false;
+            }
+            return true;
+        }).ToList();
+
     private void RefreshStaticWarnings()
     {
         WarningText = string.IsNullOrWhiteSpace(_settings.EsExePath) || !File.Exists(_settings.EsExePath)

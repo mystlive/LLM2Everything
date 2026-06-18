@@ -109,6 +109,7 @@ public sealed class EsSearchRequest
     public string Query { get; set; } = "";
     public int? Limit { get; set; } = 1000;
     public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(30);
+    public bool SortDateModifiedDescending { get; set; }
 }
 
 public sealed class EsSearchResponse

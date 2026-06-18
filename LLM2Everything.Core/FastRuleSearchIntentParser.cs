@@ -47,6 +47,7 @@ public sealed class FastRuleSearchIntentParser : ISearchIntentParser
                 meaningful = true;
             }
         }
+        AddAliasFileTypes(text, intent, ref meaningful);
 
         foreach (Match match in Regex.Matches(text, @"(?:^|[\s　])\.?([a-zA-Z0-9][a-zA-Z0-9_-]{1,8})(?:$|[\s　]|ファイル|のみ|以上|以下)"))
         {
@@ -113,6 +114,8 @@ public sealed class FastRuleSearchIntentParser : ISearchIntentParser
             intent.ContainsRelativeDate = true;
             meaningful = true;
         }
+        if (intent.Modified.Start is null)
+            ParseDayOfMonth(text, input.Now, intent, ref meaningful);
 
         ParseSize(text, intent, ref meaningful);
         ParseTerms(text, intent, ref meaningful);
@@ -185,6 +188,41 @@ public sealed class FastRuleSearchIntentParser : ISearchIntentParser
             meaningful = true;
         }
     }
+
+    private static void AddAliasFileTypes(string text, SearchIntent intent, ref bool meaningful)
+    {
+        if (ContainsAny(text, "エクセル", "excel", "xlsx", "xls", "表計算", "ワークシート"))
+        {
+            intent.Extensions.AddRange(["xls", "xlsx", "xlsm", "xlsb"]);
+            meaningful = true;
+        }
+        if (ContainsAny(text, "ワード", "word"))
+        {
+            intent.Extensions.AddRange(["doc", "docx"]);
+            meaningful = true;
+        }
+        if (ContainsAny(text, "パワポ", "パワーポイント", "powerpoint"))
+        {
+            intent.Extensions.AddRange(["ppt", "pptx"]);
+            meaningful = true;
+        }
+    }
+
+    private void ParseDayOfMonth(string text, DateTimeOffset now, SearchIntent intent, ref bool meaningful)
+    {
+        if (Regex.IsMatch(text, @"過去\s*\d+\s*日")) return;
+        var match = Regex.Match(text, @"(?<!\d)(\d{1,2})\s*日(?:の|に|作成|更新)?");
+        if (!match.Success || !int.TryParse(match.Groups[1].Value, out var day)) return;
+
+        var jst = _dates.ToJst(now);
+        if (day < 1 || day > DateTime.DaysInMonth(jst.Year, jst.Month)) return;
+        intent.Modified = _dates.DayOfCurrentMonth(now, day);
+        intent.ContainsRelativeDate = true;
+        meaningful = true;
+    }
+
+    private static bool ContainsAny(string text, params string[] values) =>
+        values.Any(v => text.Contains(v, StringComparison.OrdinalIgnoreCase));
 
     private static long ToBytes(double value, string unit) => unit.ToUpperInvariant() switch
     {

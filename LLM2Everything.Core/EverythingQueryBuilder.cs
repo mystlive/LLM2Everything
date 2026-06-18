@@ -4,7 +4,7 @@ namespace LLM2Everything.Core;
 
 public sealed class EverythingQueryBuilder
 {
-    public string Build(SearchIntent intent, IReadOnlyList<FileTypeDefinition> fileTypes)
+    public string Build(SearchIntent intent, IReadOnlyList<FileTypeDefinition> fileTypes, bool includeDateFilters = true)
     {
         if (intent.Decision != SearchDecision.Searchable)
             return "";
@@ -35,8 +35,11 @@ public sealed class EverythingQueryBuilder
         if (intent.EntryKind == EntryKind.FolderOnly) parts.Add("folder:");
         if (intent.Size.MinBytes is not null) parts.Add($"size:>={intent.Size.MinBytes}");
         if (intent.Size.MaxBytes is not null) parts.Add($"size:<={intent.Size.MaxBytes}");
-        AddDate(parts, "dm", intent.Modified);
-        AddDate(parts, "dc", intent.Created);
+        if (includeDateFilters)
+        {
+            AddDate(parts, "dm", intent.Modified);
+            AddDate(parts, "dc", intent.Created);
+        }
 
         return string.Join(" ", parts);
     }

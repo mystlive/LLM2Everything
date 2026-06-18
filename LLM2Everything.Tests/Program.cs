@@ -5,6 +5,8 @@ var tests = new List<(string Name, Func<Task> Body)>
 {
     ("高速ルール: PDF", async () => await ParseAssert("PDF", r => r.Intent.Extensions.Contains("pdf"))),
     ("高速ルール: 昨日の画像", async () => await ParseAssert("昨日の画像", r => r.Intent.FileTypes.Contains("画像") && r.Intent.Modified.Label == "昨日")),
+    ("高速ルール: 昨日のエクセル", async () => await ParseAssert("昨日のエクセル", r => r.Intent.Extensions.Contains("xlsx") && r.Intent.Modified.Label == "昨日")),
+    ("高速ルール: 17日のxlsx", async () => await ParseAssert("17日のxlsx", r => r.Intent.Extensions.Contains("xlsx") && r.Intent.Modified.Start!.Value.Day == 17)),
     ("高速ルール: EドライブのGGUF", async () => await ParseAssert("EドライブのGGUF", r => r.Intent.TargetFolders.Contains(@"E:\") && r.Intent.Extensions.Contains("gguf"))),
     ("高速ルール: 1GB以上のZIP", async () => await ParseAssert("1GB以上のZIP", r => r.Intent.Size.MinBytes == 1073741824L && r.Intent.Extensions.Contains("zip"))),
     ("高速ルール: 除外語", async () => await ParseAssert("releaseを除くソースコード", r => r.Intent.ExcludeTerms.Contains("release") && r.Intent.FileTypes.Contains("ソースコード"))),

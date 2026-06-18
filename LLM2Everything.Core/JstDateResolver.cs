@@ -38,4 +38,11 @@ public sealed class JstDateResolver
 
     public DateRange PastDays(DateTimeOffset now, int days) => new(ToJst(now).AddDays(-days), ToJst(now), $"過去{days}日");
     public DateRange PastHours(DateTimeOffset now, int hours) => new(ToJst(now).AddHours(-hours), ToJst(now), $"過去{hours}時間");
+
+    public DateRange DayOfCurrentMonth(DateTimeOffset now, int day)
+    {
+        var jst = ToJst(now);
+        var start = new DateTimeOffset(jst.Year, jst.Month, day, 0, 0, 0, JstOffset);
+        return new(start, start.AddDays(1).AddTicks(-1), $"{day}日");
+    }
 }
