@@ -6,7 +6,7 @@ public static class ProductInfo
     public const string AppDisplayName = "LLM2Everything";
     public const string WindowTitle = "LLM2Everything - 日本語ファイル検索";
     public const string LogAppName = "LLM2Everything";
-    public const string PromptVersion = "search-intent-v2";
+    public const string PromptVersion = "search-intent-v3";
 
     public static string LocalAppDataFolder
     {
