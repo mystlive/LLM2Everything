@@ -75,25 +75,26 @@ public sealed class FastRuleSearchIntentParser : ISearchIntentParser
             meaningful = true;
         }
 
-        if (text.Contains("昨日"))
+        ParseWeekdayDate(text, input.Now, intent, ref meaningful);
+        if (intent.Modified.Start is null && text.Contains("昨日"))
         {
             intent.Modified = _dates.Yesterday(input.Now);
             intent.ContainsRelativeDate = true;
             meaningful = true;
         }
-        else if (text.Contains("今日"))
+        else if (intent.Modified.Start is null && text.Contains("今日"))
         {
             intent.Modified = _dates.Today(input.Now);
             intent.ContainsRelativeDate = true;
             meaningful = true;
         }
-        else if (text.Contains("先週"))
+        else if (intent.Modified.Start is null && text.Contains("先週"))
         {
             intent.Modified = _dates.LastWeek(input.Now);
             intent.ContainsRelativeDate = true;
             meaningful = true;
         }
-        else if (text.Contains("今週"))
+        else if (intent.Modified.Start is null && text.Contains("今週"))
         {
             intent.Modified = _dates.ThisWeek(input.Now);
             intent.ContainsRelativeDate = true;
@@ -237,6 +238,31 @@ public sealed class FastRuleSearchIntentParser : ISearchIntentParser
         intent.ContainsRelativeDate = true;
         meaningful = true;
     }
+
+    private void ParseWeekdayDate(string text, DateTimeOffset now, SearchIntent intent, ref bool meaningful)
+    {
+        var match = Regex.Match(text, @"(先週|今週)\s*(月曜(?:日)?|火曜(?:日)?|水曜(?:日)?|木曜(?:日)?|金曜(?:日)?|土曜(?:日)?|日曜(?:日)?)");
+        if (!match.Success) return;
+
+        var day = ToDayOfWeek(match.Groups[2].Value);
+        intent.Modified = match.Groups[1].Value == "先週"
+            ? _dates.DayOfLastWeek(now, day)
+            : _dates.DayOfThisWeek(now, day);
+        intent.ContainsRelativeDate = true;
+        meaningful = true;
+    }
+
+    private static DayOfWeek ToDayOfWeek(string text) => text[0] switch
+    {
+        '月' => DayOfWeek.Monday,
+        '火' => DayOfWeek.Tuesday,
+        '水' => DayOfWeek.Wednesday,
+        '木' => DayOfWeek.Thursday,
+        '金' => DayOfWeek.Friday,
+        '土' => DayOfWeek.Saturday,
+        '日' => DayOfWeek.Sunday,
+        _ => throw new ArgumentOutOfRangeException(nameof(text), text, "曜日を解釈できません。")
+    };
 
     private static bool ContainsAny(string text, params string[] values) =>
         values.Any(v => text.Contains(v, StringComparison.OrdinalIgnoreCase));
