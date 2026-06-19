@@ -110,13 +110,23 @@
                 <ListBox ItemsSource="{Binding History}" BorderThickness="0">
                     <ListBox.ItemTemplate>
                         <DataTemplate>
-                            <Button Command="{Binding DataContext.RerunHistoryCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                    CommandParameter="{Binding}" HorizontalContentAlignment="Left">
-                                <StackPanel>
-                                    <TextBlock Text="{Binding Input}" TextTrimming="CharacterEllipsis"/>
-                                    <TextBlock Text="{Binding ResultCount, StringFormat={}{0}件}" FontSize="11" Foreground="#6B7280"/>
-                                </StackPanel>
-                            </Button>
+                            <Grid Margin="0,1">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="24"/>
+                                </Grid.ColumnDefinitions>
+                                <Button Grid.Column="0" Padding="4,2" MinHeight="34"
+                                        Command="{Binding DataContext.RerunHistoryCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                        CommandParameter="{Binding}" HorizontalContentAlignment="Left">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Input}" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Text="{Binding ResultCount, StringFormat={}{0}件}" FontSize="11" Foreground="#6B7280"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button Grid.Column="1" Content="×" Padding="0" MinWidth="22" MinHeight="22"
+                                        Command="{Binding DataContext.DeleteHistoryCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                        CommandParameter="{Binding}" ToolTip="履歴から削除"/>
+                            </Grid>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>

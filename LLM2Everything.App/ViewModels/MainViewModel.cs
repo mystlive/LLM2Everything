@@ -206,6 +206,14 @@ public sealed partial class MainViewModel : ObservableObject
         await RunSearchPipelineAsync(_cts.Token);
     }
 
+    [RelayCommand(CanExecute = nameof(CanOperate))]
+    private async Task DeleteHistoryAsync(HistoryEntry? entry)
+    {
+        if (entry is null) return;
+        History.Remove(entry);
+        await _historyRepository.SaveAsync(History.ToList());
+    }
+
     private bool CanOperate() => !IsBusy;
 
     private async Task RunSearchPipelineAsync(CancellationToken token)
@@ -356,6 +364,7 @@ public sealed partial class MainViewModel : ObservableObject
         SearchCommand.NotifyCanExecuteChanged();
         SearchEditedQueryCommand.NotifyCanExecuteChanged();
         OpenSettingsCommand.NotifyCanExecuteChanged();
+        DeleteHistoryCommand.NotifyCanExecuteChanged();
     }
     private static bool HasAppSideFilters(SearchIntent intent) =>
         HasDateFilters(intent) ||
