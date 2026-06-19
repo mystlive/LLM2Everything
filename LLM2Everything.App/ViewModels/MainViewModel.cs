@@ -285,7 +285,7 @@ public sealed partial class MainViewModel : ObservableObject
         }
         SetBusy("es.exeで検索中", TimeSpan.FromSeconds(_settings.EverythingTimeoutSeconds));
         var hasAppSideFilters = intent is not null && HasAppSideFilters(intent);
-        var executableQuery = hasAppSideFilters ? _queryBuilder.Build(intent!, _fileTypes, includeDateFilters: false) : query;
+        var executableQuery = hasAppSideFilters ? _queryBuilder.Build(intent!, _fileTypes, includeDateFilters: false, includeSizeFilters: false) : query;
         if (string.IsNullOrWhiteSpace(executableQuery) && hasAppSideFilters)
             executableQuery = ".";
         if (string.IsNullOrWhiteSpace(executableQuery))
@@ -301,7 +301,7 @@ public sealed partial class MainViewModel : ObservableObject
             Query = executableQuery,
             Limit = rawLimit,
             Timeout = TimeSpan.FromSeconds(_settings.EverythingTimeoutSeconds),
-            SortDateModifiedDescending = hasAppSideFilters
+            SortDateModifiedDescending = intent is not null && HasDateFilters(intent)
         }, token);
         var filteredResults = hasAppSideFilters ? ApplyAppSideFilters(response.Results, intent!) : response.Results;
         if (_settings.ResultLimit is > 0)
@@ -358,6 +358,10 @@ public sealed partial class MainViewModel : ObservableObject
         OpenSettingsCommand.NotifyCanExecuteChanged();
     }
     private static bool HasAppSideFilters(SearchIntent intent) =>
+        HasDateFilters(intent) ||
+        intent.Size.MinBytes is not null || intent.Size.MaxBytes is not null;
+
+    private static bool HasDateFilters(SearchIntent intent) =>
         intent.Modified.Start is not null || intent.Modified.End is not null;
 
     private static List<SearchResultItem> ApplyAppSideFilters(IEnumerable<SearchResultItem> results, SearchIntent intent) =>
@@ -368,6 +372,12 @@ public sealed partial class MainViewModel : ObservableObject
                 if (item.ModifiedAt is null) return false;
                 if (intent.Modified.Start is not null && item.ModifiedAt.Value < intent.Modified.Start.Value) return false;
                 if (intent.Modified.End is not null && item.ModifiedAt.Value > intent.Modified.End.Value) return false;
+            }
+            if (intent.Size.MinBytes is not null || intent.Size.MaxBytes is not null)
+            {
+                if (item.SizeBytes is null) return false;
+                if (intent.Size.MinBytes is not null && item.SizeBytes.Value < intent.Size.MinBytes.Value) return false;
+                if (intent.Size.MaxBytes is not null && item.SizeBytes.Value > intent.Size.MaxBytes.Value) return false;
             }
             return true;
         }).ToList();

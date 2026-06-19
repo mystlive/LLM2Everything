@@ -8,6 +8,7 @@ var tests = new List<(string Name, Func<Task> Body)>
     ("高速ルール: 昨日のエクセル", async () => await ParseAssert("昨日のエクセル", r => r.Intent.Extensions.Contains("xlsx") && r.Intent.Modified.Label == "昨日")),
     ("高速ルール: 17日のxlsx", async () => await ParseAssert("17日のxlsx", r => r.Intent.Extensions.Contains("xlsx") && r.Intent.Modified.Start!.Value.Day == 17)),
     ("高速ルール: EドライブのGGUF", async () => await ParseAssert("EドライブのGGUF", r => r.Intent.TargetFolders.Contains(@"E:\") && r.Intent.Extensions.Contains("gguf"))),
+    ("高速ルール: 1GB以上のGGUF", async () => await ParseAssert("1GB以上のGGUF", r => r.Intent.Size.MinBytes == 1073741824L && r.Intent.Extensions.Contains("gguf"))),
     ("高速ルール: 1GB以上のZIP", async () => await ParseAssert("1GB以上のZIP", r => r.Intent.Size.MinBytes == 1073741824L && r.Intent.Extensions.Contains("zip"))),
     ("高速ルール: 除外語", async () => await ParseAssert("releaseを除くソースコード", r => r.Intent.ExcludeTerms.Contains("release") && r.Intent.FileTypes.Contains("ソースコード"))),
     ("日時: JST今日", () => DateAssert(d => d.Today(new DateTimeOffset(2026, 1, 1, 15, 0, 0, TimeSpan.Zero)).Start!.Value.Day == 2)),
@@ -20,6 +21,7 @@ var tests = new List<(string Name, Func<Task> Body)>
     ("検索式: 引用符と除外", () => QueryAssert(i => i.ExcludeTerms.Add("bad name"), q => q.Contains("!\"bad name\""))),
     ("検索式: 拡張子複数", () => QueryAssert(i => { i.Extensions.Add("pdf"); i.Extensions.Add("docx"); }, q => q.Contains("<ext:docx|ext:pdf>") || q.Contains("<ext:pdf|ext:docx>"))),
     ("検索式: 日付フィルター除外", QueryDateFilterAssert),
+    ("検索式: サイズフィルター除外", QuerySizeFilterAssert),
     ("es.exe: 日時サイズ付き日本語パス", EsOutputParseAssert),
     ("保存: 履歴20件上限", HistoryLimitAssert),
     ("保存: キャッシュ100件上限", CacheLimitAssert),
@@ -146,6 +148,22 @@ static Task QueryDateFilterAssert()
     if (executableQuery.Contains("dm:", StringComparison.Ordinal))
         throw new InvalidOperationException(executableQuery);
     if (!executableQuery.Contains("ext:xlsx", StringComparison.Ordinal))
+        throw new InvalidOperationException(executableQuery);
+    return Task.CompletedTask;
+}
+
+static Task QuerySizeFilterAssert()
+{
+    var intent = new SearchIntent { Size = new SizeRange(1073741824L, null) };
+    intent.Extensions.Add("gguf");
+    var builder = new EverythingQueryBuilder();
+    var displayQuery = builder.Build(intent, DefaultFileTypes.Create());
+    var executableQuery = builder.Build(intent, DefaultFileTypes.Create(), includeSizeFilters: false);
+    if (!displayQuery.Contains("size:>=1073741824", StringComparison.Ordinal))
+        throw new InvalidOperationException(displayQuery);
+    if (executableQuery.Contains("size:", StringComparison.Ordinal))
+        throw new InvalidOperationException(executableQuery);
+    if (!executableQuery.Contains("ext:gguf", StringComparison.Ordinal))
         throw new InvalidOperationException(executableQuery);
     return Task.CompletedTask;
 }
