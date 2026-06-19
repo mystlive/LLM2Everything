@@ -37,6 +37,7 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool isDetailVisible;
     [ObservableProperty] private FileTypeModeOption selectedFileTypeModeOption;
     [ObservableProperty] private FileTypeDefinition? selectedFileType;
+    [ObservableProperty] private HistoryEntry? selectedHistoryEntry;
     [ObservableProperty] private string elapsedText = "";
     [ObservableProperty] private string warningText = "";
     [ObservableProperty] private string folderScopeText = "Everything側の全インデックス対象";
@@ -137,6 +138,11 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     partial void OnFolderTextChanged(string value) => UpdateFolderScopeText();
+    partial void OnSelectedHistoryEntryChanged(HistoryEntry? value)
+    {
+        RerunSelectedHistoryCommand.NotifyCanExecuteChanged();
+        DeleteSelectedHistoryCommand.NotifyCanExecuteChanged();
+    }
 
     [RelayCommand(CanExecute = nameof(CanOperate))]
     private async Task OpenSettingsAsync()
@@ -206,15 +212,21 @@ public sealed partial class MainViewModel : ObservableObject
         await RunSearchPipelineAsync(_cts.Token);
     }
 
-    [RelayCommand(CanExecute = nameof(CanOperate))]
-    private async Task DeleteHistoryAsync(HistoryEntry? entry)
+    [RelayCommand(CanExecute = nameof(CanUseSelectedHistory))]
+    private async Task RerunSelectedHistoryAsync() => await RerunHistoryAsync(SelectedHistoryEntry);
+
+    [RelayCommand(CanExecute = nameof(CanUseSelectedHistory))]
+    private async Task DeleteSelectedHistoryAsync()
     {
+        var entry = SelectedHistoryEntry;
         if (entry is null) return;
         History.Remove(entry);
+        SelectedHistoryEntry = null;
         await _historyRepository.SaveAsync(History.ToList());
     }
 
     private bool CanOperate() => !IsBusy;
+    private bool CanUseSelectedHistory() => !IsBusy && SelectedHistoryEntry is not null;
 
     private async Task RunSearchPipelineAsync(CancellationToken token)
     {
@@ -364,7 +376,8 @@ public sealed partial class MainViewModel : ObservableObject
         SearchCommand.NotifyCanExecuteChanged();
         SearchEditedQueryCommand.NotifyCanExecuteChanged();
         OpenSettingsCommand.NotifyCanExecuteChanged();
-        DeleteHistoryCommand.NotifyCanExecuteChanged();
+        RerunSelectedHistoryCommand.NotifyCanExecuteChanged();
+        DeleteSelectedHistoryCommand.NotifyCanExecuteChanged();
     }
     private static bool HasAppSideFilters(SearchIntent intent) =>
         HasDateFilters(intent) ||
