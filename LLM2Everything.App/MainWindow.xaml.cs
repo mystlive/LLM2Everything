@@ -35,6 +35,12 @@ public partial class MainWindow : Window
             vm.OpenItemCommand.Execute(item);
     }
 
+    private void History_DoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (DataContext is MainViewModel vm && vm.RerunSelectedHistoryCommand.CanExecute(null))
+            vm.RerunSelectedHistoryCommand.Execute(null);
+    }
+
     private void GridViewColumnHeader_Click(object sender, RoutedEventArgs e)
     {
         if (e.OriginalSource is not GridViewColumnHeader { Column: { Header: string header } } || DataContext is not MainViewModel vm)
