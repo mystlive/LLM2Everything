@@ -48,6 +48,7 @@ public sealed class FastRuleSearchIntentParser : ISearchIntentParser
             }
         }
         AddAliasFileTypes(text, intent, ref meaningful);
+        AddBusinessDocumentAliases(text, intent, ref meaningful);
 
         foreach (Match match in Regex.Matches(text, @"(?:^|[\s　])\.?([a-zA-Z0-9][a-zA-Z0-9_-]{1,8})(?:$|[\s　]|ファイル|のみ|以上|以下)"))
         {
@@ -135,6 +136,11 @@ public sealed class FastRuleSearchIntentParser : ISearchIntentParser
         intent.Extensions = intent.Extensions.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         intent.FileTypes = intent.FileTypes.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         intent.TargetFolders = intent.TargetFolders.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        intent.IncludeAnyTermGroups = intent.IncludeAnyTermGroups
+            .Select(g => g.Where(t => !string.IsNullOrWhiteSpace(t)).Distinct(StringComparer.OrdinalIgnoreCase).ToList())
+            .Where(g => g.Count > 0)
+            .DistinctBy(g => string.Join("\u001f", g), StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
         if (!meaningful)
         {
@@ -208,6 +214,17 @@ public sealed class FastRuleSearchIntentParser : ISearchIntentParser
         }
     }
 
+    private static void AddBusinessDocumentAliases(string text, SearchIntent intent, ref bool meaningful)
+    {
+        foreach (var group in BusinessDocumentAliasGroups)
+        {
+            if (!ContainsAny(text, group))
+                continue;
+            intent.IncludeAnyTermGroups.Add(group.ToList());
+            meaningful = true;
+        }
+    }
+
     private void ParseDayOfMonth(string text, DateTimeOffset now, SearchIntent intent, ref bool meaningful)
     {
         if (Regex.IsMatch(text, @"過去\s*\d+\s*日")) return;
@@ -223,6 +240,20 @@ public sealed class FastRuleSearchIntentParser : ISearchIntentParser
 
     private static bool ContainsAny(string text, params string[] values) =>
         values.Any(v => text.Contains(v, StringComparison.OrdinalIgnoreCase));
+
+    private static readonly string[][] BusinessDocumentAliasGroups =
+    [
+        ["請求書", "請求", "invoice", "インボイス"],
+        ["見積書", "見積もり書", "見積り書", "見積もり", "見積り", "見積", "御見積", "quotation", "quote"],
+        ["NDA", "秘密保持契約", "機密保持契約", "秘密保持", "機密保持", "non-disclosure", "nondisclosure"],
+        ["契約書", "契約", "agreement", "contract"],
+        ["注文書", "発注書", "注文", "発注", "purchase order", "po"],
+        ["納品書", "納品", "delivery note"],
+        ["領収書", "領収", "receipt"],
+        ["申込書", "申込み書", "申し込み書", "申込", "申込み", "application"],
+        ["提案書", "提案", "proposal"],
+        ["仕様書", "仕様", "spec", "specification"]
+    ];
 
     private static long ToBytes(double value, string unit) => unit.ToUpperInvariant() switch
     {

@@ -20,6 +20,7 @@ public sealed class SearchIntent
 {
     public SearchDecision Decision { get; set; } = SearchDecision.Searchable;
     public List<string> IncludeTerms { get; set; } = [];
+    public List<List<string>> IncludeAnyTermGroups { get; set; } = [];
     public List<string> ExcludeTerms { get; set; } = [];
     public List<string> TargetFolders { get; set; } = [];
     public List<string> FileTypes { get; set; } = [];

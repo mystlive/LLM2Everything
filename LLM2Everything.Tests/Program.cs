@@ -6,6 +6,9 @@ var tests = new List<(string Name, Func<Task> Body)>
     ("高速ルール: PDF", async () => await ParseAssert("PDF", r => r.Intent.Extensions.Contains("pdf"))),
     ("高速ルール: 昨日の画像", async () => await ParseAssert("昨日の画像", r => r.Intent.FileTypes.Contains("画像") && r.Intent.Modified.Label == "昨日")),
     ("高速ルール: 昨日のエクセル", async () => await ParseAssert("昨日のエクセル", r => r.Intent.Extensions.Contains("xlsx") && r.Intent.Modified.Label == "昨日")),
+    ("高速ルール: 請求書のエクセル", async () => await ParseAssert("請求書のエクセル", r => r.Intent.Extensions.Contains("xlsx") && HasAnyGroup(r.Intent, "請求書", "invoice"))),
+    ("高速ルール: NDA", async () => await ParseAssert("NDA", r => HasAnyGroup(r.Intent, "NDA", "秘密保持契約"))),
+    ("高速ルール: 見積もり書", async () => await ParseAssert("見積もり書", r => HasAnyGroup(r.Intent, "見積書", "quotation"))),
     ("高速ルール: 17日のxlsx", async () => await ParseAssert("17日のxlsx", r => r.Intent.Extensions.Contains("xlsx") && r.Intent.Modified.Start!.Value.Day == 17)),
     ("高速ルール: EドライブのGGUF", async () => await ParseAssert("EドライブのGGUF", r => r.Intent.TargetFolders.Contains(@"E:\") && r.Intent.Extensions.Contains("gguf"))),
     ("高速ルール: 1GB以上のGGUF", async () => await ParseAssert("1GB以上のGGUF", r => r.Intent.Size.MinBytes == 1073741824L && r.Intent.Extensions.Contains("gguf"))),
@@ -20,6 +23,7 @@ var tests = new List<(string Name, Func<Task> Body)>
     ("検索式: 日本語パスと空白", () => QueryAssert(i => i.TargetFolders.Add(@"D:\日本語 パス"), q => q.Contains("path:\"D:\\日本語 パス\""))),
     ("検索式: 引用符と除外", () => QueryAssert(i => i.ExcludeTerms.Add("bad name"), q => q.Contains("!\"bad name\""))),
     ("検索式: 拡張子複数", () => QueryAssert(i => { i.Extensions.Add("pdf"); i.Extensions.Add("docx"); }, q => q.Contains("<ext:docx|ext:pdf>") || q.Contains("<ext:pdf|ext:docx>"))),
+    ("検索式: 業務文書名の揺らぎ", QueryBusinessAliasAssert),
     ("検索式: 日付フィルター除外", QueryDateFilterAssert),
     ("検索式: サイズフィルター除外", QuerySizeFilterAssert),
     ("es.exe: 日時サイズ付き日本語パス", EsOutputParseAssert),
@@ -168,6 +172,19 @@ static Task QuerySizeFilterAssert()
     return Task.CompletedTask;
 }
 
+static Task QueryBusinessAliasAssert()
+{
+    var intent = new SearchIntent();
+    intent.Extensions.Add("xlsx");
+    intent.IncludeAnyTermGroups.Add(["請求書", "請求", "invoice", "インボイス"]);
+    var query = new EverythingQueryBuilder().Build(intent, DefaultFileTypes.Create());
+    if (!query.Contains("ext:xlsx", StringComparison.Ordinal))
+        throw new InvalidOperationException(query);
+    if (!query.Contains("<請求書|請求|invoice|インボイス>", StringComparison.Ordinal))
+        throw new InvalidOperationException(query);
+    return Task.CompletedTask;
+}
+
 static Task EsOutputParseAssert()
 {
     var line = @"2026-06-17T14:58:11      59,686 D:\Users\mystl\Downloads\ジェイネッツ一括導入_検討資料_202606.xlsx";
@@ -195,3 +212,6 @@ static async Task WithDataDirAsync(string path, Func<Task> body)
         Environment.SetEnvironmentVariable("LLM2EVERYTHING_DATA_DIR", previous);
     }
 }
+
+static bool HasAnyGroup(SearchIntent intent, params string[] terms) =>
+    intent.IncludeAnyTermGroups.Any(group => terms.All(term => group.Contains(term, StringComparer.OrdinalIgnoreCase)));

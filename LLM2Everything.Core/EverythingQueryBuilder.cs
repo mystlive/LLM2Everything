@@ -28,6 +28,14 @@ public sealed class EverythingQueryBuilder
 
         foreach (var term in intent.IncludeTerms.Where(t => !string.IsNullOrWhiteSpace(t)))
             parts.Add(QuoteToken(term));
+        foreach (var group in intent.IncludeAnyTermGroups)
+        {
+            var terms = group.Where(t => !string.IsNullOrWhiteSpace(t)).Select(QuoteToken).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            if (terms.Count == 1)
+                parts.Add(terms[0]);
+            else if (terms.Count > 1)
+                parts.Add("<" + string.Join("|", terms) + ">");
+        }
         foreach (var term in intent.ExcludeTerms.Where(t => !string.IsNullOrWhiteSpace(t)))
             parts.Add("!" + QuoteToken(term));
 
